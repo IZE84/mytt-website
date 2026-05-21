@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ivan Zelenika · Tischtennis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0d0f0e;
+  --surface: #161918;
+  --surface2: #1e2220;
+  --border: rgba(255,255,255,0.07);
+  --border-strong: rgba(255,255,255,0.14);
+  --text: #f0ede8;
+  --text-muted: #8a9090;
+  --text-hint: #4a5252;
+  --accent: #7dff8f;
+  --accent-dim: rgba(125,255,143,0.12);
+  --accent-dim2: rgba(125,255,143,0.06);
+  --red: #ff6b6b;
+  --red-dim: rgba(255,107,107,0.12);
+  --gold: #ffd166;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ── Layout ── */
+.page { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem 5rem; }
+
+/* ── Header ── */
+.site-header {
+  padding: 2.5rem 0 2rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2.5rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.player-name {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(28px, 5vw, 48px);
+  font-weight: 700;
+  letter-spacing: -1px;
+  line-height: 1;
+}
+.player-sub { font-size: 13px; color: var(--text-muted); margin-top: 6px; }
+.update-time { font-size: 12px; color: var(--text-hint); font-family: 'DM Mono', monospace; }
+
+/* ── Nav Tabs ── */
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--border);
+}
+.tab {
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Section ── */
+.section { display: none; }
+.section.active { display: block; }
+
+/* ── Metrics ── */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 1.5rem;
+}
+.metric {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+}
+.metric-label { font-size: 11px; color: var(--text-hint); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 8px; }
+.metric-val { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+.metric-sub { font-size: 12px; color: var(--text-muted); margin-top: 6px; font-family: 'DM Mono', monospace; }
+.pos { color: var(--accent); }
+.neg { color: var(--red); }
+.gold { color: var(--gold); }
+
+/* ── Card ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+}
+.card-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-hint);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Bar ── */
+.bar-wrap { margin-bottom: 1.25rem; }
+.bar-labels { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+.bar-labels strong { color: var(--text); font-weight: 500; }
+.bar-track { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 1.2s cubic-bezier(.22,1,.36,1); width: 0%; }
+
+/* ── Match list ── */
+.match-list { display: flex; flex-direction: column; }
+.match-item {
+  display: grid;
+  grid-template-columns: 30px 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.match-item:last-child { border-bottom: none; }
+.badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 3px 7px;
+  border-radius: 6px;
+  text-align: center;
+}
+.badge-s { background: var(--accent-dim); color: var(--accent); }
+.badge-n { background: var(--red-dim); color: var(--red); }
+.badge-t { background: rgba(255,255,255,0.06); color: var(--text-muted); }
+.match-opp { color: var(--text); }
+.match-date { font-size: 11px; color: var(--text-hint); font-family: 'DM Mono', monospace; }
+.match-score { font-family: 'DM Mono', monospace; color: var(--text-muted); font-size: 12px; }
+.match-delta { font-family: 'DM Mono', monospace; font-size: 12px; min-width: 38px; text-align: right; }
+
+/* ── Chart ── */
+.chart-wrap { height: 220px; position: relative; }
+
+/* ── Grid 2col ── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 1rem; }
+@media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
+
+.stat-box {
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+.stat-box-label { font-size: 11px; color: var(--text-hint); margin-bottom: 5px; }
+.stat-box-val { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 600; }
+.stat-box-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+/* ── Table ── */
+.league-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.league-table th {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-hint);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 8px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+.league-table th:first-child,
+.league-table th:nth-child(2) { text-align: left; }
+.league-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  text-align: right;
+}
+.league-table td:first-child { color: var(--text-hint); width: 28px; }
+.league-table td:nth-child(2) { color: var(--text); text-align: left; }
+.league-table tr.highlight td { color: var(--accent); }
+.league-table tr.highlight td:first-child { color: var(--accent); }
+.league-table tr:last-child td { border-bottom: none; }
+
+/* ── Schedule ── */
+.game-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.game-item:last-child { border-bottom: none; }
+.game-date { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-hint); min-width: 80px; }
+.game-teams { flex: 1; color: var(--text); }
+.game-result {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  min-width: 40px;
+  text-align: right;
+}
+.result-w { color: var(--accent); }
+.result-l { color: var(--red); }
+.result-upcoming { color: var(--text-hint); }
+
+/* ── Loading / Error ── */
+.loading { color: var(--text-hint); font-size: 13px; padding: 2rem 0; }
+.error-box {
+  background: var(--red-dim);
+  border: 1px solid rgba(255,107,107,0.2);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  font-size: 13px;
+  color: var(--red);
+  margin-bottom: 1rem;
+}
+
+/* ── Team section ── */
+.team-picker { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.team-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+.team-btn:hover { color: var(--text); border-color: var(--border-strong); }
+.team-btn.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: rgba(125,255,143,0.3);
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <header class="site-header">
+    <div>
+      <div class="player-name" id="hdr-name">Ivan Zelenika</div>
+      <div class="player-sub">SV Rohrau · TTBW · NU2769890</div>
+    </div>
+    <div class="update-time" id="hdr-updated"></div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" onclick="switchTab('stats', this)">Meine Stats</button>
+    <button class="tab" onclick="switchTab('team', this)">Mannschaft</button>
+  </nav>
+
+  <!-- ── Persönliche Stats ── -->
+  <div id="tab-stats" class="section active">
+    <div class="metrics" id="metrics-row">
+      <div class="metric"><div class="metric-label">TTR aktuell</div><div class="metric-val" id="m-ttr">—</div><div class="metric-sub" id="m-delta"></div></div>
+      <div class="metric"><div class="metric-label">Q-TTR</div><div class="metric-val" id="m-qttr">—</div><div class="metric-sub" id="m-qttr-date"></div></div>
+      <div class="metric"><div class="metric-label">Max-TTR</div><div class="metric-val gold" id="m-max">—</div><div class="metric-sub" id="m-max-date"></div></div>
+      <div class="metric"><div class="metric-label">Siege</div><div class="metric-val pos" id="m-wins">—</div><div class="metric-sub" id="m-win-sub"></div></div>
+      <div class="metric"><div class="metric-label">Niederlagen</div><div class="metric-val neg" id="m-losses">—</div><div class="metric-sub" id="m-loss-sub"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Siegquote</div>
+      <div class="bar-wrap">
+        <div class="bar-labels"><strong id="pct-val">—</strong><span id="pct-total"></span></div>
+        <div class="bar-track"><div class="bar-fill" id="pct-bar"></div></div>
+      </div>
+      <div class="grid-2">
+        <div class="stat-box">
+          <div class="stat-box-label">Heim</div>
+          <div class="stat-box-val pos" id="ha-home">—</div>
+          <div class="stat-box-sub" id="ha-home-sub"></div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-box-label">Auswärts</div>
+          <div class="stat-box-val pos" id="ha-away">—</div>
+          <div class="stat-box-sub" id="ha-away-sub"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">TTR-Verlauf</div>
+      <div class="chart-wrap"><canvas id="ttr-chart"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Letzte Spiele</div>
+      <div class="match-list" id="match-list"><div class="loading">Lade...</div></div>
+    </div>
+  </div>
+
+  <!-- ── Mannschaft ── -->
+  <div id="tab-team" class="section">
+    <div class="team-picker" id="team-picker"></div>
+
+    <div class="grid-2" style="margin-bottom:1rem;">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-title">Tabelle</div>
+        <div id="table-wrap"><div class="loading">Lade...</div></div>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <div class="card-title">Spielplan</div>
+        <div id="schedule-wrap"><div class="loading">Lade...</div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const TEAMS = [
+  { id: "2961473", group_id: "494308", name: "Erwachsene KLB" },
+  { id: "2961739", group_id: "500517", name: "Senioren 40" },
+];
+let activeTeam = 0;
+let chartInst = null;
+
+// ── Tab switching ─────────────────────────────────────────────────────────
+function switchTab(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Load JSON from /data/ ─────────────────────────────────────────────────
+async function loadJSON(name) {
+  const res = await fetch(`data/${name}.json`);
+  if (!res.ok) throw new Error(res.status);
+  return res.json();
+}
+
+// ── Personal Stats ────────────────────────────────────────────────────────
+async function loadPersonalStats() {
+  try {
+    const ttr = await loadJSON('ttr_history');
+    renderTTR(ttr);
+  } catch(e) {
+    document.getElementById('match-list').innerHTML =
+      `<div class="error-box">Keine Daten vorhanden. Bitte erst <code>fetch_data.py</code> ausführen.</div>`;
+    console.warn(e);
+  }
+
+  try {
+    const ms = await loadJSON('match_stats');
+    if (ms?.data?.matches) renderMatchStats(ms.data.matches);
+  } catch(_) {}
+}
+
+function renderTTR(d) {
+  const events = d.event || [];
+
+  document.getElementById('m-ttr').textContent = d.ttr ?? '—';
+  document.getElementById('m-max').textContent = d.max_ttr ?? '—';
+  document.getElementById('m-max-date').textContent = d.max_ttr_date ? '🏆 ' + d.max_ttr_date : '';
+  document.getElementById('m-qttr').textContent = d.ttr_last_fixed ?? '—';
+  document.getElementById('m-qttr-date').textContent = d.formattedTtrLastFixedDate ?? '';
+
+  if (events.length >= 2) {
+    const delta = (events[0].ttr_after ?? d.ttr) - (events[events.length-1].ttr_before ?? d.ttr);
+    const el = document.getElementById('m-delta');
+    el.textContent = (delta >= 0 ? '+' : '') + delta + ' Saison';
+    el.className = 'metric-sub ' + (delta >= 0 ? 'pos' : 'neg');
+  }
+
+  // Chart
+  const rev = [...events].reverse();
+  const labels = rev.map(e => {
+    const d = new Date(e.event_date_time);
+    return d.toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'});
+  });
+  const vals = rev.map(e => e.ttr_after);
+
+  if (chartInst) chartInst.destroy();
+  const ctx = document.getElementById('ttr-chart').getContext('2d');
+  chartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: vals,
+        borderColor: '#7dff8f',
+        backgroundColor: 'rgba(125,255,143,0.05)',
+        borderWidth: 2,
+        pointRadius: vals.length < 30 ? 4 : 0,
+        pointBackgroundColor: rev.map(e => e.ttr_delta >= 0 ? '#7dff8f' : '#ff6b6b'),
+        pointBorderColor: 'transparent',
+        tension: 0.35, fill: true
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => 'TTR: ' + c.parsed.y } } },
+      scales: {
+        x: { ticks: { font: { family: 'DM Mono', size: 10 }, color: '#4a5252', maxTicksLimit: 8 }, grid: { display: false }, border: { display: false } },
+        y: { ticks: { font: { family: 'DM Mono', size: 10 }, color: '#4a5252' }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false } }
+      }
+    }
+  });
+
+  // Match list
+  const list = document.getElementById('match-list');
+  list.innerHTML = '';
+  events.slice(0, 15).forEach(ev => {
+    const m = ev.match?.[0];
+    const won = ev.matches_won > ev.matches_lost;
+    const tie = ev.matches_won === ev.matches_lost;
+    const delta = ev.ttr_delta || 0;
+    const d = document.createElement('div');
+    d.className = 'match-item';
+    const bclass = ev.type === 'competition' ? 'badge-t' : won ? 'badge-s' : tie ? 'badge-t' : 'badge-n';
+    const blabel = ev.type === 'competition' ? 'T' : won ? 'S' : 'N';
+    d.innerHTML = `
+      <span class="badge ${bclass}">${blabel}</span>
+      <span class="match-opp">${m?.other_person_name || ev.event_name.split('|').pop().trim() || '—'}</span>
+      <span class="match-date">${ev.formattedEventDate || ''}</span>
+      <span class="match-score">${ev.matches_won}:${ev.matches_lost}</span>
+      <span class="match-delta ${delta>=0?'pos':'neg'}">${delta>=0?'+':''}${delta}</span>
+    `;
+    list.appendChild(d);
+  });
+}
+
+function renderMatchStats(m) {
+  const total = (m.wins||0) + (m.losses||0);
+  document.getElementById('m-wins').textContent = m.wins ?? '—';
+  document.getElementById('m-losses').textContent = m.losses ?? '—';
+  if (total > 0) {
+    const pct = Math.round((m.wins/total)*100);
+    document.getElementById('pct-val').textContent = pct + '%';
+    document.getElementById('pct-total').textContent = total + ' Spiele';
+    document.getElementById('m-win-sub').textContent = 'von ' + total;
+    document.getElementById('m-loss-sub').textContent = 'von ' + total;
+    setTimeout(() => { document.getElementById('pct-bar').style.width = pct + '%'; }, 200);
+    const hw = (m.home_wins||[]).length, hl = (m.home_losses||[]).length;
+    const aw = (m.guest_wins||[]).length, al = (m.guest_losses||[]).length;
+    document.getElementById('ha-home').textContent = hw + ' S / ' + hl + ' N';
+    document.getElementById('ha-home-sub').textContent = (hw+hl) + ' Heimspiele';
+    document.getElementById('ha-away').textContent = aw + ' S / ' + al + ' N';
+    document.getElementById('ha-away-sub').textContent = (aw+al) + ' Auswärtsspiele';
+  }
+}
+
+// ── Team Data ─────────────────────────────────────────────────────────────
+function initTeamPicker() {
+  const picker = document.getElementById('team-picker');
+  TEAMS.forEach((t, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'team-btn' + (i === 0 ? ' active' : '');
+    btn.textContent = t.name;
+    btn.onclick = () => {
+      document.querySelectorAll('.team-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeTeam = i;
+      loadTeamData(i);
+    };
+    picker.appendChild(btn);
+  });
+}
+
+async function loadTeamData(idx) {
+  const team = TEAMS[idx];
+  document.getElementById('table-wrap').innerHTML = '<div class="loading">Lade...</div>';
+  document.getElementById('schedule-wrap').innerHTML = '<div class="loading">Lade...</div>';
+
+  try {
+    const data = await loadJSON(`table_${team.group_id}`);
+    renderTable(data, team);
+  } catch(e) {
+    document.getElementById('table-wrap').innerHTML = '<div class="error-box">Tabelle nicht verfügbar</div>';
+  }
+
+  try {
+    const data = await loadJSON(`schedule_${team.id}`);
+    renderSchedule(data);
+  } catch(e) {
+    document.getElementById('schedule-wrap').innerHTML = '<div class="error-box">Spielplan nicht verfügbar</div>';
+  }
+}
+
+function renderTable(data, team) {
+  const rows = data.data || [];
+  if (!rows.length) { document.getElementById('table-wrap').innerHTML = '<div class="loading">Keine Daten</div>'; return; }
+  let html = `<table class="league-table">
+    <thead><tr>
+      <th>#</th><th>Mannschaft</th><th>Sp</th><th>P</th>
+    </tr></thead><tbody>`;
+  rows.forEach(r => {
+    const isMe = r.club_id === '03024';
+    html += `<tr${isMe ? ' class="highlight"' : ''}>
+      <td>${r.table_rank}</td>
+      <td>${r.team_name}</td>
+      <td>${(parseInt(r.points_won||0)+parseInt(r.points_lost||0))}</td>
+      <td><strong>${r.points_won}:${r.points_lost}</strong></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  document.getElementById('table-wrap').innerHTML = html;
+}
+
+function renderSchedule(data) {
+  const games = data.data || [];
+  if (!games.length) { document.getElementById('schedule-wrap').innerHTML = '<div class="loading">Keine Spiele</div>'; return; }
+  let html = '';
+  const sorted = [...games].sort((a,b) => new Date(b.date) - new Date(a.date));
+  sorted.slice(0, 12).forEach(g => {
+    const date = new Date(g.date);
+    const dateStr = date.toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'});
+    const isPast = date < new Date();
+    const opp = g.opponent_team_name || '—';
+    let result = '', rclass = '';
+    if (isPast && g.matches_won !== undefined) {
+      const w = parseInt(g.matches_won||0), l = parseInt(g.matches_lost||0);
+      result = w + ':' + l;
+      rclass = w > l ? 'result-w' : w < l ? 'result-l' : '';
+    } else if (!isPast) {
+      result = '–'; rclass = 'result-upcoming';
+    }
+    html += `<div class="game-item">
+      <span class="game-date">${dateStr}</span>
+      <span class="game-teams">${opp}</span>
+      <span class="game-result ${rclass}">${result}</span>
+    </div>`;
+  });
+  document.getElementById('schedule-wrap').innerHTML = html;
+}
+
+// ── Meta ──────────────────────────────────────────────────────────────────
+async function loadMeta() {
+  try {
+    const m = await loadJSON('meta');
+    if (m.updated_at) {
+      const d = new Date(m.updated_at);
+      document.getElementById('hdr-updated').textContent =
+        'Stand: ' + d.toLocaleDateString('de-DE') + ' ' + d.toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'});
+    }
+  } catch(_) {}
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(async () => {
+  await loadMeta();
+  await loadPersonalStats();
+  initTeamPicker();
+  await loadTeamData(0);
+})();
+</script>
+</body>
+</html>
